@@ -1,0 +1,129 @@
+#!/bin/bash
+
+# - Description: Configures nftables firewall for workstations.
+# - Enables IP forwarding, restarts nftables, and sets up tables, chains, and rules
+# for filtering, NAT, and connection tracking (e.g., established connections).
+# - Includes optional rules (e.g., zabbix). Exits on any error using set -e.
+# - To add new rules or configurations, copy and edit functions like chains or zabbix.
+
+# Close on any error
+set -e
+
+# Interfaces
+WAN='br_vlan710'
+
+# Enable IP forwarding
+ip_forwarding() {
+    sysctl -w net.ipv4.ip_forward=1
+    if [[ $? -ne 0 ]]; then
+        printf "\e[31m*\e[0m Error: Failed to enable IP forwarding.\n"
+        exit 1
+    fi
+}
+
+# Restart nftables service
+restart_nftables() {
+    local SERVICE=nftables
+    systemctl restart "$SERVICE"
+    if [[ $? -ne 0 ]]; then
+        printf "\e[31m*\e[0m Error: Failed to restart $SERVICE.\n"
+        exit 1
+    fi
+}
+
+# Flush existing nftables rules
+flush_nftables() {
+    nft flush ruleset
+}
+
+# Create main table
+main_table() {
+    nft add table inet firelux
+}
+
+# Create chains
+chains() {
+    nft add chain inet firelux forward { type filter hook forward priority filter \; policy drop \; }
+    nft add chain inet firelux prerouting { type nat hook prerouting priority 0 \; policy accept \; }
+    nft add chain inet firelux postrouting { type nat hook postrouting priority srcnat \; policy accept \; }
+}
+
+# Allow established and related connections
+established_related() {
+    # Filter Rules
+    nft add rule inet firelux forward ct state established,related accept
+}
+
+# Configure NAT and forwarding for Bridge (BR_TAP110)
+br_tap110() {
+    # Masquerade Rules
+    nft add rule inet firelux postrouting ip saddr 10.0.10.0/24 oifname "$WAN" masquerade
+
+    # Forward Rules
+    nft add rule inet firelux forward iifname "br_tap110" oifname "$WAN" accept
+}
+
+ct212810_4533() {
+    # Music Streaming - Navidrome
+    # DNAT Rules
+    nft add rule inet firelux prerouting ip protocol tcp tcp dport 4533 dnat to 10.0.10.2:4533
+
+    # Forward Rules
+    nft add rule inet firelux forward ip protocol tcp tcp dport 4533 accept
+}
+
+ct915942_8096() {
+    # Video Streaming - Jellyfin
+    # DNAT Rules
+    nft add rule inet firelux prerouting ip protocol tcp tcp dport 8096 dnat to 10.0.10.3:8096
+
+    # Forward Rules
+    nft add rule inet firelux forward ip protocol tcp tcp dport 8096 accept
+}
+
+9091() {
+    # Web P2P Client - Transmission
+    # DNAT Rules
+    nft add rule inet firelux prerouting ip protocol tcp tcp dport 9091 dnat to 10.0.10.4:9091
+
+    # Forward Rules
+    nft add rule inet firelux forward ip protocol tcp tcp dport 9091 accept
+}
+
+ct442878() {
+    # Music Streaming - MPD Server with USB DAC passthrough
+    # DNAT Rules
+    nft add rule inet firelux prerouting ip protocol tcp tcp dport 5644 dnat to 10.0.10.5:5644
+    nft add rule inet firelux prerouting ip protocol tcp tcp dport 6600 dnat to 10.0.10.5:6600
+
+    # Forward Rules
+    nft add rule inet firelux forward ip protocol tcp tcp dport 5644 accept
+    nft add rule inet firelux forward ip protocol tcp tcp dport 6600 accept
+}
+
+ct418656_6081() {
+    # AI Code Editor - Windsurf
+    # DNAT Rules
+    nft add rule inet firelux prerouting ip protocol tcp tcp dport 6081 dnat to 10.0.10.6:6080
+
+    # Forward Rules
+    nft add rule inet firelux forward ip protocol tcp tcp dport 6080 accept
+}
+
+# Main function to orchestrate the setup
+main() {
+    ip_forwarding
+    restart_nftables
+    flush_nftables
+    main_table
+    chains
+    established_related
+    br_tap110
+    ct212810_4533
+    ct915942_8096
+    ct442878
+    ct418656_6081
+}
+
+# Execute main function
+main
