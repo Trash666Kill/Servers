@@ -27,7 +27,7 @@ CT915942() {
 }
 
 CT885705() {
-    # Web P2P Client - Transmission
+    # Web P2P Client - qBittorrent NoX
     lxc-start --name CT885705
 }
 
