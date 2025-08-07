@@ -81,15 +81,6 @@ ct915942_8096() {
     nft add rule inet firelux forward ip protocol tcp tcp dport 8096 accept
 }
 
-ct885705_9091() {
-    # Web P2P Client - Transmission
-    # DNAT Rules
-    nft add rule inet firelux prerouting ip protocol tcp tcp dport 9091 dnat to 10.0.10.4:9091
-
-    # Forward Rules
-    nft add rule inet firelux forward ip protocol tcp tcp dport 9091 accept
-}
-
 ct442878() {
     # Music Streaming - MPD Server with USB DAC passthrough
     # DNAT Rules
@@ -121,7 +112,6 @@ main() {
     br_tap110
     ct212810_4533
     ct915942_8096
-    ct885705_9091
     ct442878
     ct418656_6081
 }
