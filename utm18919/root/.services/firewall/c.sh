@@ -67,10 +67,17 @@ configure_servers() {
 
     # Libera o Forward da LAN0 para a VLAN dos Servidores na porta 4242
     set_forward "br_lan0" "vlan710" "tcp" "4242"
+    # Virtual Machines and Container
+    set_forward "vlan910" "enp9s0" "tcp" "6600"
+    set_forward "vlan910" "enp9s0" "tcp" "5644"
 
     # Aplica os DNATs apontando para os servidores internos correspondentes
     set_dnat "br_lan0" "172.16.2.0/24" "tcp" "4242" "172.16.10.1"
     set_dnat "br_lan0" "172.16.2.0/24" "tcp" "4242" "172.16.10.2"
+    # Virtual Machines and Containers
+    set_dnat "vlan910" "192.168.10.0/24" "tcp" "6600" "10.0.10.5"
+    set_dnat "vlan910" "192.168.10.0/24" "tcp" "5644" "10.0.10.5"
+
 }
 
 # Verificação de sanidade local (Garante que a tabela principal existe)
