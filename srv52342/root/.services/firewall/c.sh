@@ -43,11 +43,26 @@ ct615237() {
     5644
 }
 
+ct485153() {
+    4553() {
+        #Music Streaming - Navidrome
+        # DNAT Rules
+        nft add rule inet firelux prerouting iifname "$NIC0" ip protocol tcp tcp dport 4533 dnat to 10.0.10.53:4533
+
+        # Forward Rules
+        nft add rule inet firelux forward ip protocol tcp tcp dport 4533 accept
+    }
+
+    # Call
+    4553
+}
+
 # Main function to orchestrate the setup
 main() {
     RULES="
     ct160716
     ct615237
+    ct485153
     "
 
     for RULE in $RULES
