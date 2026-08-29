@@ -44,7 +44,7 @@ ct615237() {
 }
 
 ct485153() {
-    4553() {
+    4533() {
         #Music Streaming - Navidrome
         # DNAT Rules
         nft add rule inet firelux prerouting iifname "$NIC0" ip protocol tcp tcp dport 4533 dnat to 10.0.10.53:4533
@@ -54,7 +54,7 @@ ct485153() {
     }
 
     # Call
-    4553
+    4533
 }
 
 # Main function to orchestrate the setup
