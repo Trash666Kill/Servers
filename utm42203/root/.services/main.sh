@@ -169,7 +169,10 @@ main
 # Successfully completed
 notify_success() {
     # Silently turns off the PWR LED.
-    echo 0 | sudo tee /sys/class/leds/PWR/brightness > /dev/null
+    echo 0 | sudo tee /sys/class/leds/PWR/brightness > /dev/nulli
+
+    # Activate MMC0 action mode LED
+    echo mmc0 | sudo tee /sys/class/leds/ACT/trigger
 
     # Displays the success message
     printf '\e[32m*\e[0m All scripts and services executed successfully!\n'
