@@ -70,6 +70,7 @@ configure_servers() {
     # Virtual Machines and Container
     set_forward "vlan910" "vlan710" "tcp" "6600"
     set_forward "vlan910" "vlan710" "tcp" "5644"
+    set_forward "vlan910" "vlan710" "tcp" "4533"
     set_forward "br_lan0" "vlan710" "tcp" "5900"
     set_forward "br_lan0" "vlan710" "tcp" "445"
 
@@ -78,6 +79,7 @@ configure_servers() {
     # Virtual Machines and Containers
     set_dnat "vlan910" "192.168.10.0/24" "tcp" "6600" "172.16.10.1"
     set_dnat "vlan910" "192.168.10.0/24" "tcp" "5644" "172.16.10.1"
+    set_dnat "vlan910" "192.168.10.0/24" "tcp" "4533" "172.16.10.1"
     set_dnat "br_lan0" "172.16.2.0/24" "tcp" "5900" "172.16.10.1"
     set_dnat "br_lan0" "172.16.2.0/24" "tcp" "445" "172.16.10.1"
 
