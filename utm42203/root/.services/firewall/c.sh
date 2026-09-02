@@ -59,6 +59,30 @@ set_forward() {
 }
 
 # ---------------------------------------------------------------------------
+# Função Genérica de Forward com filtro de IP de Origem (saddr)
+# Usada para liberar tráfego de SAÍDA (ex: LAN -> WAN) de um host interno
+# específico, sem envolver DNAT.
+# Argumentos:
+#   $1 = Interface de Origem (In)   (ex: vlan710)
+#   $2 = Interface de Destino (Out) (ex: br_wan0)
+#   $3 = IP de Origem (ex: 172.16.10.1)
+#   $4 = Protocolo (tcp / udp)
+#   $5 = Porta (pode ser uma única porta "7844" ou um set "{ 80, 443 }")
+# ---------------------------------------------------------------------------
+set_forward_saddr() {
+    local iifname="$1"
+    local oifname="$2"
+    local saddr="$3"
+    local proto="$4"
+    local port="$5"
+
+    msg_info "Configuring Forward (saddr): ${iifname} -> ${oifname} from ${saddr} (${proto}/${port})..."
+
+    nft add rule inet firelux forward iifname "$iifname" oifname "$oifname" ip saddr "$saddr" "$proto" dport $port accept || \
+        msg_warn "WARNING: Failed to apply Forward(saddr) rule from ${iifname} to ${oifname} (src ${saddr})"
+}
+
+# ---------------------------------------------------------------------------
 # Blocos de Dispositivos / VLANs
 # ---------------------------------------------------------------------------
 
@@ -73,6 +97,10 @@ configure_servers() {
     set_forward "vlan910" "vlan710" "tcp" "4533"
     set_forward "br_lan0" "vlan710" "tcp" "5900"
     set_forward "br_lan0" "vlan710" "tcp" "445"
+
+    # Tráfego de saída do servidor 172.16.10.1 para a WAN
+    set_forward_saddr "vlan710" "br_wan0" "172.16.10.1" "udp" "7844"
+    set_forward_saddr "vlan710" "br_wan0" "172.16.10.1" "tcp" "7844"
 
     # Aplica os DNATs apontando para os servidores internos correspondentes
     set_dnat "br_lan0" "172.16.2.0/24" "tcp" "4242" "172.16.10.1"
