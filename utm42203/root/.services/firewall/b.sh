@@ -56,7 +56,9 @@ server() {
     nft add rule inet firelux forward iifname "vlan710" oifname @wan_ifaces meta l4proto { icmp, ipv6-icmp } accept
     nft add rule inet firelux forward iifname "vlan710" oifname @wan_ifaces udp dport 53 accept
     nft add rule inet firelux forward iifname "vlan710" oifname @wan_ifaces tcp dport {53, 853} accept
-    nft add rule inet firelux forward iifname "vlan710" oifname @wan_ifaces tcp dport {80, 443} accept
+    # Dynamic FQDN set
+    nft add set inet firelux deb_ips '{ type ipv4_addr; flags interval, timeout; timeout 6h; }' 2>/dev/null || true
+    nft add rule inet firelux forward iifname "vlan710" oifname @wan_ifaces ip daddr @deb_ips tcp dport { 80, 443 } accept
 }
 
 virtual_machine() {
