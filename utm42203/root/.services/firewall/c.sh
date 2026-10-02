@@ -1,141 +1,119 @@
 #!/bin/bash
 
-# ---------------------------------------------------------------------------
-# network_dynamic.sh — Regras Dinâmicas de DNAT e Forwarding.
-#
-# Este script fornece uma estrutura genérica e parametrizada para suportar
-# múltiplas VLANs, ranges de IP e diferentes tipos de dispositivos/serviços.
-# ---------------------------------------------------------------------------
+# Resolve firelux.py relative to this script's own location, so c.sh keeps
+# working regardless of where it's called from.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FIRELUX="${SCRIPT_DIR}/firelux.py"
 
-set -e
+if [ ! -f "$FIRELUX" ]; then
+    echo "ERROR: firelux.py not found at ${FIRELUX}" >&2
+    exit 1
+fi
 
-# Helpers de Log no padrão do projeto
-msg_info() { printf "\e[32m*\e[0m %s\n" "$1"; }
-msg_warn() { printf "\e[33m*\e[0m %s\n" "$1"; }
-msg_err()  { printf "\e[31m*\e[0m %s\n" "$1"; }
+firelux() { python3 "$FIRELUX" "$@"; }
 
-# ---------------------------------------------------------------------------
-# Função Genérica de DNAT
-# Argumentos:
-#   $1 = Interface de Origem (ex: br_lan0, vlan910)
-#   $2 = IP/Subnet de Destino Original (ex: 172.16.2.0/24)
-#   $3 = Protocolo (tcp / udp)
-#   $4 = Porta de Entrada (ex: 4242, 80)
-#   $5 = IP Interno do Alvo (ex: 172.16.10.1)
-#   $6 = Porta Interna do Alvo (Opcional - se omitida, assume a mesma do $4)
-# ---------------------------------------------------------------------------
-set_dnat() {
-    local iifname="$1"
-    local orig_daddr="$2"
-    local proto="$3"
-    local port="$4"
-    local target_ip="$5"
-    local target_port="${6:-$port}" # Usa a porta de entrada se a interna não for passada
+# *br_lan0 to vlan710
+#SSH srv79266
+firelux dnat \
+  --iface br_lan0 --dest 172.16.2.0/24 \
+  --proto tcp --port 4242 \
+  --target-ip 172.16.10.1 --target-iface vlan710 --apply
+#VNC srv79266
+firelux dnat \
+  --iface br_lan0 --dest 172.16.2.0/24 \
+  --proto tcp --port 5900 \
+  --target-ip 172.16.10.1 --target-iface vlan710 --apply
+#SMB/CIFS srv79266
+firelux dnat \
+  --iface br_lan0 --dest 172.16.2.0/24 \
+  --proto tcp --port 445 \
+  --target-ip 172.16.10.1 --target-iface vlan710 --apply
 
-    msg_info "Configuring DNAT: ${iifname} -> ${target_ip}:${target_port} (${proto}/${port})..."
+# *vlan910 to vlan710
+#MPD Server srv79266
+firelux dnat \
+  --iface vlan910 --dest 192.168.10.0/24 \
+  --proto tcp --port 6600 \
+  --target-ip 172.16.10.1 --target-iface vlan710 --apply
+#MyMPD Client Web Server srv79266
+firelux dnat \
+  --iface vlan910 --dest 192.168.10.0/24 \
+  --proto tcp --port 5644 \
+  --target-ip 172.16.10.1 --target-iface vlan710 --apply
+#Navidrome Music Streaming Server srv79266
+firelux dnat \
+  --iface vlan910 --dest 192.168.10.0/24 \
+  --proto tcp --port 4533 \
+  --target-ip 172.16.10.1 --target-iface vlan710 --apply
+#Debian repo srv79266
+firelux allow-fqdn \
+  --name debian_repo \
+  --source 172.16.10.1/24 \
+  --iface vlan710 \
+  --fqdn deb.debian.org security.debian.org \
+  --proto tcp \
+  --port 80 443 \
+  --apply
+#LXC Images repo srv79266
+firelux allow-fqdn \
+  --name lxc_img_repo \
+  --source 172.16.10.1/24 \
+  --iface vlan710 \
+  --fqdn images.linuxcontainers.org \
+  --proto tcp \
+  --port 80 443 \
+  --apply
 
-    nft add rule inet firelux prerouting iifname "$iifname" ip daddr "$orig_daddr" "$proto" dport "$port" dnat to "${target_ip}:${target_port}" || \
-        msg_warn "WARNING: Failed to apply DNAT rule for ${target_ip}"
-}
+# *vlan710 to br_wan0 (Internet Gateway)
+#Cloudflare Tunnel
+firelux forward \
+  --iface vlan710 --oface br_wan0 --source 172.16.10.1 \
+  --proto tcp udp --port 7844 --apply
 
-# ---------------------------------------------------------------------------
-# Função Genérica de Forward
-# Argumentos:
-#   $1 = Interface de Origem (In)
-#   $2 = Interface de Destino (Out)
-#   $3 = Protocolo (tcp / udp)
-#   $4 = Porta (pode ser uma única porta "80" ou um set "{ 80, 443 }")
-# ---------------------------------------------------------------------------
-set_forward() {
-    local iifname="$1"
-    local oifname="$2"
-    local proto="$3"
-    local port="$4"
+# *Allow WhatsApp to br_lan0
+#TCP: web, mensagens, fallback de mídia
+firelux allow-fqdn \
+  --name whatsapp \
+  --source 172.16.2.0/24 \
+  --iface br_lan0 \
+  --fqdn whatsapp.com whatsapp.net wa.me fbcdn.net facebook.com \
+  --proto tcp \
+  --port 443 5222 5223 5228 4244 \
+  --apply
+#UDP: STUN (setup de chamadas), mesmo set de IPs do grupo acima
+firelux allow-fqdn \
+  --name whatsapp \
+  --source 172.16.2.0/24 \
+  --iface br_lan0 \
+  --fqdn whatsapp.com whatsapp.net wa.me fbcdn.net facebook.com \
+  --proto udp \
+  --port 3478 \
+  --apply
+#UDP: mídia RTP (faixa efêmera)
+firelux forward \
+  --iface br_lan0 --oface @wan_ifaces --source 172.16.2.0/24 \
+  --proto udp --port 1024-65535 --apply
 
-    msg_info "Configuring Forward: ${iifname} -> ${oifname} (${proto}/${port})..."
-
-    nft add rule inet firelux forward iifname "$iifname" oifname "$oifname" "$proto" dport $port accept || \
-        msg_warn "WARNING: Failed to apply Forward rule from ${iifname} to ${oifname}"
-}
-
-# ---------------------------------------------------------------------------
-# Função Genérica de Forward com filtro de IP de Origem (saddr)
-# Usada para liberar tráfego de SAÍDA (ex: LAN -> WAN) de um host interno
-# específico, sem envolver DNAT.
-# Argumentos:
-#   $1 = Interface de Origem (In)   (ex: vlan710)
-#   $2 = Interface de Destino (Out) (ex: br_wan0)
-#   $3 = IP de Origem (ex: 172.16.10.1)
-#   $4 = Protocolo (tcp / udp)
-#   $5 = Porta (pode ser uma única porta "7844" ou um set "{ 80, 443 }")
-# ---------------------------------------------------------------------------
-set_forward_saddr() {
-    local iifname="$1"
-    local oifname="$2"
-    local saddr="$3"
-    local proto="$4"
-    local port="$5"
-
-    msg_info "Configuring Forward (saddr): ${iifname} -> ${oifname} from ${saddr} (${proto}/${port})..."
-
-    nft add rule inet firelux forward iifname "$iifname" oifname "$oifname" ip saddr "$saddr" "$proto" dport $port accept || \
-        msg_warn "WARNING: Failed to apply Forward(saddr) rule from ${iifname} to ${oifname} (src ${saddr})"
-}
-
-# ---------------------------------------------------------------------------
-# Blocos de Dispositivos / VLANs
-# ---------------------------------------------------------------------------
-
-configure_servers() {
-    msg_info "Processing Application Servers (VLAN 710)..."
-
-    # Libera o Forward da LAN0 para a VLAN dos Servidores na porta 4242
-    set_forward "br_lan0" "vlan710" "tcp" "4242"
-    # Virtual Machines and Container
-    set_forward "vlan910" "vlan710" "tcp" "6600"
-    set_forward "vlan910" "vlan710" "tcp" "5644"
-    set_forward "vlan910" "vlan710" "tcp" "4533"
-    set_forward "br_lan0" "vlan710" "tcp" "5900"
-    set_forward "br_lan0" "vlan710" "tcp" "445"
-
-    # Tráfego de saída do servidor 172.16.10.1 para a WAN
-    set_forward_saddr "vlan710" "br_wan0" "172.16.10.1" "udp" "7844"
-    set_forward_saddr "vlan710" "br_wan0" "172.16.10.1" "tcp" "7844"
-
-    # Aplica os DNATs apontando para os servidores internos correspondentes
-    set_dnat "br_lan0" "172.16.2.0/24" "tcp" "4242" "172.16.10.1"
-    # Virtual Machines and Containers
-    set_dnat "vlan910" "192.168.10.0/24" "tcp" "6600" "172.16.10.1"
-    set_dnat "vlan910" "192.168.10.0/24" "tcp" "5644" "172.16.10.1"
-    set_dnat "vlan910" "192.168.10.0/24" "tcp" "4533" "172.16.10.1"
-    set_dnat "br_lan0" "172.16.2.0/24" "tcp" "5900" "172.16.10.1"
-    set_dnat "br_lan0" "172.16.2.0/24" "tcp" "445" "172.16.10.1"
-
-}
-
-# Verificação de sanidade local (Garante que a tabela principal existe)
-preflight() {
-    msg_info "Preflight: checking firewall architecture..."
-
-    if ! nft list table inet firelux >/dev/null 2>&1; then
-        msg_err "ERROR: table inet firelux not found. Ensure firewall is running."
-        exit 1
-    fi
-}
-
-# Bloco principal de execução
-main() {
-    local -a RULES=(
-        preflight
-        configure_servers
-    )
-
-    for rule in "${RULES[@]}"; do
-        "$rule"
-        sleep 1
-    done
-
-    msg_info "ALL DYNAMIC RULES CONFIGURATION PROCESS COMPLETED"
-}
-
-main
+# *Allow WhatsApp to vlan910
+#TCP: web, mensagens, fallback de mídia
+firelux allow-fqdn \
+  --name whatsapp \
+  --source 192.168.10.0/24 \
+  --iface vlan910 \
+  --fqdn whatsapp.com whatsapp.net wa.me fbcdn.net facebook.com \
+  --proto tcp \
+  --port 443 5222 5223 5228 4244 \
+  --apply
+#UDP: STUN (setup de chamadas), mesmo set de IPs do grupo acima
+firelux allow-fqdn \
+  --name whatsapp \
+  --source 192.168.10.0/24 \
+  --iface vlan910 \
+  --fqdn whatsapp.com whatsapp.net wa.me fbcdn.net facebook.com \
+  --proto udp \
+  --port 3478 \
+  --apply
+#UDP: mídia RTP (faixa efêmera)
+firelux forward \
+  --iface vlan910 --oface @wan_ifaces --source 192.168.10.0/24 \
+  --proto udp --port 1024-65535 --apply
