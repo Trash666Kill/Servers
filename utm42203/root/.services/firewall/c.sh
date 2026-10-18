@@ -18,7 +18,7 @@ firelux dnat \
   --iface br_lan0 --dest 172.16.2.0/24 \
   --proto tcp --port 4242 \
   --target-ip 172.16.10.1 --target-iface vlan710 --apply
-#SSH ?
+#SSH srv74209
 firelux dnat \
   --iface br_lan0 --dest 172.16.2.0/24 \
   --proto tcp --port 4242 \
