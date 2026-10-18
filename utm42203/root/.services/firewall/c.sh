@@ -64,6 +64,13 @@ firelux allow-fqdn \
   --port 80 443 \
   --apply
 
+#vlan710 to br_lan0
+#SSH Woody Workstation
+firelux dnat \
+  --iface vlan710 --dest 172.16.10.1 \
+  --proto tcp --port 22 \
+  --target-ip 172.16.2.2 --target-iface br_lan0 --apply
+
 # *vlan710 to br_wan0 (Internet Gateway)
 #Cloudflare Tunnel
 firelux forward \
