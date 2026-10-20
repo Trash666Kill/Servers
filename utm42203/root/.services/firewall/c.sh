@@ -33,6 +33,11 @@ firelux dnat \
   --iface br_lan0 --dest 172.16.2.0/24 \
   --proto tcp --port 445 \
   --target-ip 172.16.10.1 --target-iface vlan710 --apply
+#SMB/CIFS srv74209
+firelux dnat \
+  --iface br_lan0 --dest 172.16.2.0/24 \
+  --proto tcp --port 445 \
+  --target-ip 172.16.10.2 --target-iface vlan710 --apply
 
 # *vlan910 to vlan710
 #MPD Server srv79266
