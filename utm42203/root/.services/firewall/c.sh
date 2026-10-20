@@ -53,16 +53,16 @@ firelux dnat \
 #Debian repo srv79266
 firelux allow-fqdn \
   --name debian_repo \
-  --source 172.16.10.1/24 \
+  --source 172.16.10.0/24 \
   --iface vlan710 \
-  --fqdn deb.debian.org security.debian.org \
+  --fqdn deb.debian.org security.debian.org debian.map.fastlydns.net \
   --proto tcp \
   --port 80 443 \
   --apply
 #LXC Images repo srv79266
 firelux allow-fqdn \
   --name lxc_img_repo \
-  --source 172.16.10.1/24 \
+  --source 172.16.10.0/24 \
   --iface vlan710 \
   --fqdn images.linuxcontainers.org \
   --proto tcp \
