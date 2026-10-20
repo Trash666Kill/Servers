@@ -50,7 +50,7 @@ firelux dnat \
   --iface vlan910 --dest 192.168.10.0/24 \
   --proto tcp --port 4533 \
   --target-ip 172.16.10.1 --target-iface vlan710 --apply
-#Debian repo srv79266
+# *Allow Debian repos to Servers
 firelux allow-fqdn \
   --name debian_repo \
   --source 172.16.10.0/24 \
@@ -59,7 +59,7 @@ firelux allow-fqdn \
   --proto tcp \
   --port 80 443 \
   --apply
-#LXC Images repo srv79266
+# *Allow LXC repos to Servers
 firelux allow-fqdn \
   --name lxc_img_repo \
   --source 172.16.10.0/24 \
