@@ -32,6 +32,14 @@ firelux forward \
   --iface br_lan0 --oface vlan710 --source $LAN --dest $SRV74209 \
   --proto tcp --port 4242 445 --apply
 
+#ICMP (ping) LAN -> servers
+firelux forward \
+  --iface br_lan0 --oface vlan710 --source $LAN --dest $SRV79266 \
+  --proto icmp --apply
+firelux forward \
+  --iface br_lan0 --oface vlan710 --source $LAN --dest $SRV74209 \
+  --proto icmp --apply
+
 # *vlan910 to vlan710
 #MPD Server + MyMPD Web + Navidrome srv79266
 firelux forward \
