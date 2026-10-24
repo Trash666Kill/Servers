@@ -12,49 +12,32 @@ fi
 
 firelux() { python3 "$FIRELUX" "$@"; }
 
+# Rede local roteada: sem DNAT. Os clientes conectam direto no IP real do
+# servidor e o firewall (forward policy drop) só libera o que está listado
+# aqui. Para restringir a clientes específicos, troque --source pelo host
+# (ex.: --source 172.16.2.2).
+
+SRV79266=172.16.10.1
+SRV74209=172.16.10.2
+LAN=172.16.2.0/24
+WKS=192.168.10.0/24
+
 # *br_lan0 to vlan710
-#SSH srv79266
-firelux dnat \
-  --iface br_lan0 --dest 172.16.2.0/24 \
-  --proto tcp --port 4242 \
-  --target-ip 172.16.10.1 --target-iface vlan710 --apply
-#SSH srv74209
-firelux dnat \
-  --iface br_lan0 --dest 172.16.2.0/24 \
-  --proto tcp --port 4242 \
-  --target-ip 172.16.10.2 --target-iface vlan710 --apply
-#VNC srv79266
-firelux dnat \
-  --iface br_lan0 --dest 172.16.2.0/24 \
-  --proto tcp --port 5900 \
-  --target-ip 172.16.10.1 --target-iface vlan710 --apply
-#SMB/CIFS srv79266
-firelux dnat \
-  --iface br_lan0 --dest 172.16.2.0/24 \
-  --proto tcp --port 445 \
-  --target-ip 172.16.10.1 --target-iface vlan710 --apply
-#SMB/CIFS srv74209
-firelux dnat \
-  --iface br_lan0 --dest 172.16.2.0/24 \
-  --proto tcp --port 445 \
-  --target-ip 172.16.10.2 --target-iface vlan710 --apply
+#SSH + VNC + SMB/CIFS srv79266
+firelux forward \
+  --iface br_lan0 --oface vlan710 --source $LAN --dest $SRV79266 \
+  --proto tcp --port 4242 5900 445 --apply
+#SSH + SMB/CIFS srv74209
+firelux forward \
+  --iface br_lan0 --oface vlan710 --source $LAN --dest $SRV74209 \
+  --proto tcp --port 4242 445 --apply
 
 # *vlan910 to vlan710
-#MPD Server srv79266
-firelux dnat \
-  --iface vlan910 --dest 192.168.10.0/24 \
-  --proto tcp --port 6600 \
-  --target-ip 172.16.10.1 --target-iface vlan710 --apply
-#MyMPD Client Web Server srv79266
-firelux dnat \
-  --iface vlan910 --dest 192.168.10.0/24 \
-  --proto tcp --port 5644 \
-  --target-ip 172.16.10.1 --target-iface vlan710 --apply
-#Navidrome Music Streaming Server srv79266
-firelux dnat \
-  --iface vlan910 --dest 192.168.10.0/24 \
-  --proto tcp --port 4533 \
-  --target-ip 172.16.10.1 --target-iface vlan710 --apply
+#MPD Server + MyMPD Web + Navidrome srv79266
+firelux forward \
+  --iface vlan910 --oface vlan710 --source $WKS --dest $SRV79266 \
+  --proto tcp --port 6600 5644 4533 --apply
+
 # *Allow Debian repos to Servers
 firelux allow-fqdn \
   --name debian_repo \
@@ -75,16 +58,15 @@ firelux allow-fqdn \
   --apply
 
 #vlan710 to br_lan0
-#SSH Woody Workstation
-firelux dnat \
-  --iface vlan710 --dest 172.16.10.1 \
-  --proto tcp --port 22 \
-  --target-ip 172.16.2.2 --target-iface br_lan0 --apply
+#SSH Woody Workstation (servers -> 172.16.2.2:22 direto)
+firelux forward \
+  --iface vlan710 --oface br_lan0 --source 172.16.10.0/24 --dest 172.16.2.2 \
+  --proto tcp --port 22 --apply
 
 # *vlan710 to br_wan0 (Internet Gateway)
 #Cloudflare Tunnel
 firelux forward \
-  --iface vlan710 --oface br_wan0 --source 172.16.10.1 \
+  --iface vlan710 --oface br_wan0 --source $SRV79266 \
   --proto tcp udp --port 7844 --apply
 
 # *Allow WhatsApp to br_lan0
