@@ -120,7 +120,7 @@ main_gw() {
     br_lan0() {
         # Interface name constants
         FORMATTED_MAC="dc:a6:32:c9:d9:58"
-        BRIDGE_IFACE="br_lan0"
+	BRIDGE_IFACE="br_lan0"
 
         ip link add name "$BRIDGE_IFACE" type bridge
         ip link set dev "$BRIDGE_IFACE" type bridge vlan_filtering 0
@@ -186,6 +186,13 @@ subsidiary_gw() {
         ip addr add fda3:d6a1:a4ec:966::254/64 dev vlan966
     }
 
+    #BitTorrent
+        vlan977() {
+        ip link add link "$LAN0" name vlan977 type vlan id 977
+        ip link set dev vlan977 up
+        ip addr add 192.168.77.254/30 dev vlan977
+    }
+
     # Call
     vlan710
     #vlan714
@@ -193,6 +200,7 @@ subsidiary_gw() {
     vlan910
     #vlan922
     vlan966
+    vlan977
 }
 
 # Main function to orchestrate the setup

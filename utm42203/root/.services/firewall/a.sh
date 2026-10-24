@@ -294,6 +294,7 @@ lan_set() {
         "\"vlan710\""
         "\"vlan910\""
         "\"vlan966\""
+        "\"vlan977\""
     )
 
     local LAN_JOINED
@@ -302,6 +303,71 @@ lan_set() {
     nft add element inet firelux lan_ifaces "{ $LAN_JOINED }"
 
     msg_info "LAN set populated: $LAN_JOINED"
+}
+
+p2p_guard() {
+    msg_info "Configuring BitTorrent / DHT payload blocking on WAN..."
+
+    # Interfaces de origem ISENTAS do bloqueio (P2P liberado).
+    # Para liberar mais uma VLAN, acrescente o nome aqui.
+    local -a P2P_ALLOW_IFACES=(
+        "vlan977"
+    )
+
+    # Pré-requisito: o set wan_ifaces já existe (wan_set rodou antes).
+    # Usa `insert` para ficar NO TOPO da chain forward, acima de
+    # `ct state established,related accept`. Isso é necessário porque o
+    # handshake BitTorrent e as respostas DHT chegam em fluxos que o
+    # conntrack já considera estabelecidos. Como consequência, estas regras
+    # também ficam acima da whitelist_manual.
+    #
+    # Escopo: tráfego encaminhado (LAN/VLANs -> WAN). Não cobre o tráfego
+    # do próprio roteador (chain output).
+
+    nft add set inet firelux p2p_allow_ifaces '{ type ifname ; flags interval ; }'
+
+    local -a QUOTED=()
+    local i
+    for i in "${P2P_ALLOW_IFACES[@]}"; do
+        QUOTED+=("\"${i}\"")
+    done
+    if [ "${#QUOTED[@]}" -gt 0 ]; then
+        local JOINED
+        JOINED=$(IFS=,; echo "${QUOTED[*]}")
+        nft add element inet firelux p2p_allow_ifaces "{ $JOINED }"
+        msg_info "P2P allowed (not inspected) on: $JOINED"
+    fi
+
+    # `iifname != @p2p_allow_ifaces` vale para IPv4 e IPv6; com o set vazio
+    # o bloqueio se aplica a todas as origens.
+    local MATCH='iifname != @p2p_allow_ifaces oifname @wan_ifaces'
+
+    # ── UDP: DHT (bencode). O payload UDP começa em 64 bits (cabeçalho = 8 bytes).
+    #   "d1:ad2:id20:"  query
+    #   "d1:rd2:id20:"  response
+    nft insert rule inet firelux forward $MATCH meta l4proto udp \
+        @th,64,96 0x64313a6164323a696432303a counter drop comment \"p2p_dht_query\"
+    nft insert rule inet firelux forward $MATCH meta l4proto udp \
+        @th,64,96 0x64313a7264323a696432303a counter drop comment \"p2p_dht_response\"
+
+    #   "d2:ip6:"  response com o campo `ip` do BEP 42 (peer IPv4 = 6 bytes),
+    #              que vem ANTES de "1:rd2:id20:" e não casa com o padrão acima.
+    nft insert rule inet firelux forward $MATCH meta l4proto udp \
+        @th,64,56 0x64323a6970363a counter drop comment \"p2p_dht_response_ip\"
+
+    # ── TCP: handshake "\x13BitTorrent " (12 bytes = 96 bits).
+    # O nftables não tem offset variável e o payload TCP começa depois do
+    # cabeçalho, cujo tamanho depende das opções:
+    #   160 bits = 20 bytes (sem opções)
+    #   256 bits = 32 bytes (com timestamps, caso comum no Linux/macOS)
+    local off
+    for off in 160 256; do
+        nft insert rule inet firelux forward $MATCH meta l4proto tcp \
+            @th,${off},96 0x13426974546f7272656e7420 counter drop comment \"p2p_bt_handshake_${off}\"
+    done
+
+    # NÃO há regra de handshake em UDP: "\x13BitTorrent protocol" é só TCP.
+    # O uTP (BitTorrent sobre UDP) usa outro cabeçalho e não é coberto aqui.
 }
 
 wan_guard() {
@@ -661,6 +727,7 @@ main() {
         drop_invalid
         wan_set
         lan_set
+        p2p_guard
         wan_guard
         martians
         whitelist

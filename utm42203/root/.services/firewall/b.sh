@@ -56,9 +56,6 @@ server() {
     nft add rule inet firelux forward iifname "vlan710" oifname @wan_ifaces meta l4proto { icmp, ipv6-icmp } accept
     nft add rule inet firelux forward iifname "vlan710" oifname @wan_ifaces udp dport 53 accept
     nft add rule inet firelux forward iifname "vlan710" oifname @wan_ifaces tcp dport {53, 853} accept
-    # Dynamic FQDN set
-    nft add set inet firelux deb_ips '{ type ipv4_addr; flags interval, timeout; timeout 6h; }' 2>/dev/null || true
-    nft add rule inet firelux forward iifname "vlan710" oifname @wan_ifaces ip daddr @deb_ips tcp dport { 80, 443 } accept
 }
 
 virtual_machine() {
@@ -128,6 +125,23 @@ dmz() {
     nft add rule inet firelux forward iifname { "vlan966", "br_vlan966" } oifname @wan_ifaces accept
 }
 
+bittorrent() {
+    msg_info "Applying NAT and forward for BitTorrent VLAN (vlan977)..."
+ 
+    # A rede de 192.168.77.254/30 é 192.168.77.252/30 (e não .0/30)
+    nft add rule inet firelux postrouting ip saddr 192.168.77.252/30 oifname @wan_ifaces masquerade
+ 
+    nft add rule inet firelux forward iifname "vlan977" oifname @wan_ifaces meta l4proto { icmp, ipv6-icmp } accept
+    nft add rule inet firelux forward iifname "vlan977" oifname @wan_ifaces udp dport 53 accept
+    nft add rule inet firelux forward iifname "vlan977" oifname @wan_ifaces tcp dport {53, 853} accept
+    nft add rule inet firelux forward iifname "vlan977" oifname @wan_ifaces tcp dport {80, 443} accept
+    nft add rule inet firelux forward iifname "vlan977" oifname @wan_ifaces udp dport 443 accept
+ 
+    # P2P: peers, trackers e DHT usam portas altas arbitrárias
+    nft add rule inet firelux forward iifname "vlan977" oifname @wan_ifaces tcp dport 1024-65535 accept
+    nft add rule inet firelux forward iifname "vlan977" oifname @wan_ifaces udp dport 1024-65535 accept
+}
+
 # ---------------------------------------------------------------------------
 # Sanidade: antes de aplicar as regras, verifica se o set wan_ifaces existe.
 # Se não existir, o firewall.sh não foi executado (ou falhou) e as regras
@@ -160,6 +174,7 @@ main() {
         server
         workstation
         dmz
+        bittorrent
     )
 
     for rule in "${RULES[@]}"; do
