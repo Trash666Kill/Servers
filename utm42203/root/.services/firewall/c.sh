@@ -27,10 +27,10 @@ WKS=192.168.10.0/24
 firelux forward \
   --iface br_lan0 --oface vlan710 --source $LAN --dest $SRV79266 \
   --proto tcp --port 4242 5900 445 --apply
-#SSH + SMB/CIFS srv74209
+#SSH + SMB/CIFS + VNC srv74209
 firelux forward \
   --iface br_lan0 --oface vlan710 --source $LAN --dest $SRV74209 \
-  --proto tcp --port 4242 445 --apply
+  --proto tcp --port 4242 445 5900 --apply
 
 #ICMP (ping) LAN -> servers
 firelux forward \
