@@ -65,6 +65,16 @@ firelux allow-fqdn \
   --port 80 443 \
   --apply
 
+# *Allow Dev repos to Servers
+firelux allow-fqdn \
+  --name dev_repo \
+  --source 172.16.10.0/24 \
+  --iface vlan710 \
+  --fqdn go.dev any-in-2615.1e100.net proxy.golang.org github.com sum.golang.org \
+  --proto tcp \
+  --port 80 443 \
+  --apply
+
 #vlan710 to br_lan0
 #SSH Woody Workstation (servers -> 172.16.2.2:22 direto)
 firelux forward \
