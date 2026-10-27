@@ -70,7 +70,7 @@ firelux allow-fqdn \
   --name dev_repo \
   --source 172.16.10.0/24 \
   --iface vlan710 \
-  --fqdn go.dev any-in-2615.1e100.net proxy.golang.org github.com sum.golang.org \
+  --fqdn go.dev gopkg.in any-in-2615.1e100.net proxy.golang.org github.com sum.golang.org \
   --proto tcp \
   --port 80 443 \
   --apply
